@@ -1,0 +1,207 @@
+#include <LiquidCrystal.h>
+#include <Keypad.h>
+
+#define LED_R A2
+#define LED_G A1
+#define TIMER A0
+#define BUZZER A5
+
+int status = 0;
+
+#define Password_Length 4
+char Data[Password_Length]; 
+char Master[Password_Length] = "123"; 
+byte data_count_2 = 0, master_count_2 = 0;
+
+#define Exit_Length 4
+char Data_2[Exit_Length]; 
+char Master_2[Exit_Length] = "123"; 
+byte data_count = 0, master_count = 0;
+char input;
+
+const byte ROWS = 4; 
+const byte COLS = 4;
+
+char hexaKeys[ROWS][COLS] = {
+  {'1', '2', '3', 'A'},
+  {'4', '5', '6', 'B'},
+  {'7', '8', '9', 'C'},
+  {'*', '0', '#', 'D'}
+};
+
+byte rowPins[ROWS] = {A4,A3,7,6}; 
+byte colPins[COLS] = {5,4,3,2};
+
+Keypad pad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
+
+LiquidCrystal lcd(8,9,10,11,12,13);
+
+void setup() {
+  Serial.begin(9600);
+  lcd.begin(16,2);
+  pinMode(LED_G, OUTPUT);
+  pinMode(LED_R, OUTPUT);
+  pinMode(TIMER, INPUT);
+  pinMode(BUZZER, OUTPUT);
+}
+
+void loop() {
+  lcd.setCursor(0,0);
+  if (status == 0) {
+    digitalWrite(LED_G, HIGH);
+    lcd.print("Codice d'innesco:");
+    input = pad.getKey();
+    checkPass(input);
+  }else if(digitalRead(TIMER) == LOW && status == 1){
+    activaction();
+  }else if (digitalRead(TIMER) == HIGH && status == 1 || status == 2){
+    innescated();
+    input = pad.getKey();
+    checkExit(input);
+  }else if(status == 3 && digitalRead(TIMER) == HIGH) {
+    success();
+  }else if (status == 4) {
+    exploded();
+  }
+  delay(200);
+}
+
+
+void clearData(){
+  while(data_count !=0){
+    Data[data_count--] = 0; 
+  }
+  return;
+}
+
+void clearData_2(){
+  while(data_count !=0){
+    Data_2[data_count--] = 0; 
+  }
+  return;
+}
+
+// activator checker 
+int checkPass(char input){
+  if (input){
+    digitalWrite(LED_G, LOW);
+    Data[data_count] = input; 
+    lcd.setCursor(data_count,1);
+    lcd.print(Data[data_count]); 
+    data_count++; 
+    delay(500);
+  }
+  if(data_count == Password_Length-1){
+    lcd.clear();
+    if(!strcmp(Data, Master)){
+      lcd.print("Pin Corretto!");
+      digitalWrite(LED_R,LOW);
+      delay(1000);
+      Serial.println("codice attivazione corretto");
+      return status = 1;
+    }
+    else{
+      lcd.print("Pin Non Valido");
+      int i = 0;
+      while(i<10){
+        digitalWrite(LED_R, HIGH);
+        delay(200);
+        digitalWrite(LED_R,LOW);
+        i++;
+      }
+    }
+    lcd.clear();
+    clearData();  
+    delay(200);
+  }
+}
+
+// disinnescator checker 
+int checkExit(char input){
+  if (input){
+    digitalWrite(LED_R, LOW);
+    Data_2[data_count_2] = input; 
+    lcd.setCursor(data_count_2,1);
+    lcd.print(Data[data_count_2]); 
+    data_count_2++; 
+    delay(500);
+  }
+  if(data_count_2 == Exit_Length-1){
+    lcd.clear();
+    if(!strcmp(Data_2, Master_2)){
+      lcd.print("Codice Corretto!");
+      digitalWrite(LED_R, LOW);
+      delay(1000);
+      lcd.clear();
+      Serial.println("codice disinnesco corretto");
+      return status = 3;
+    }
+    else{
+      lcd.print("Codice Errato");
+      int i = 0;
+      while(i<10){
+        digitalWrite(LED_R, HIGH);
+        delay(200);
+        digitalWrite(LED_R,LOW);
+        i++;
+      }
+    }
+    lcd.clear();
+    clearData_2();  
+    delay(200);
+  }
+}
+
+// first state of the bomb
+void ready(){
+  lcd.clear();
+  lcd.print("Non Innescata");
+  digitalWrite(LED_R, HIGH);
+  Serial.println("inizio");
+  delay(200);
+}
+
+// turn the key 
+void activaction(){
+  lcd.print("Girare Chiave");
+  digitalWrite(LED_G, LOW);
+  digitalWrite(LED_R, HIGH);
+  delay(500);
+  digitalWrite(LED_R, LOW);
+  Serial.println("girare chiave");
+  lcd.clear();
+}
+
+// bomb is innescated
+int innescated(){
+  lcd.print("Innescata");
+  digitalWrite(LED_R, HIGH);
+  if(digitalRead(TIMER)){
+    return status = 2;
+  }else{
+    return status = 4;
+  }
+}
+
+// bomb has been secured
+void success(){
+  lcd.clear();
+  lcd.print("Ordigno");
+  lcd.setCursor(0,1);
+  lcd.print("Disinnescato!");
+  digitalWrite(LED_R, LOW);
+  digitalWrite(LED_G, HIGH);
+  Serial.println("disinnescata");
+  delay(200);
+}
+
+// bomb has been exploded
+void exploded(){
+  lcd.clear();
+  lcd.print("Ordigno");
+  lcd.setCursor(0,1);
+  lcd.print("Esploso");
+  digitalWrite(LED_R, HIGH);
+  digitalWrite(BUZZER, HIGH);
+  Serial.println("esplosa");
+}
